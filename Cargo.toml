@@ -1,0 +1,9 @@
+[package]
+name = "pacman-rust"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+
+[dependencies]
+ggez = "0.9"
+glam = "0.24"
