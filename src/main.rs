@@ -1,7 +1,8 @@
 use ggez::{
     event,
-    graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBuilder, LineCap},
+    graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBuilder, LineCap, Drawable},
     input::keyboard::{KeyCode, KeyInput},
+    input::mouse::MouseButton,
     Context, GameResult,
 };
 use glam::Vec2;
@@ -78,6 +79,7 @@ struct GameState {
     dots: Vec<Vec2>,
     score: i32,
     direction_controller: DirectionController,
+    game_won: bool,
 }
 
 impl GameState {
@@ -102,10 +104,37 @@ impl GameState {
             dots,
             score: 0,
             direction_controller: DirectionController::new(),
+            game_won: false,
         }
     }
 
+    fn reset(&mut self) {
+        // Reset dots
+        self.dots.clear();
+        for x in 1..GRID_SIZE-1 {
+            for y in 1..GRID_SIZE-1 {
+                self.dots.push(Vec2::new(
+                    x as f32 * CELL_SIZE,
+                    y as f32 * CELL_SIZE,
+                ));
+            }
+        }
+
+        // Reset pacman
+        self.pacman.pos = Vec2::new(CELL_SIZE, GRID_SIZE as f32 * CELL_SIZE / 2.0);
+        self.pacman.direction = Vec2::new(0.0, 0.0);
+        
+        // Reset score and game state
+        self.score = 0;
+        self.game_won = false;
+        self.direction_controller = DirectionController::new();
+    }
+
     fn update(&mut self) {
+        if self.game_won {
+            return;  // Don't update game if won
+        }
+
         // Update direction based on grid alignment
         if let Some(direction) = self.direction_controller.update(self.pacman.pos) {
             self.pacman.direction = direction.to_vec2();
@@ -134,6 +163,11 @@ impl GameState {
                 true
             }
         });
+
+        // Check for victory condition
+        if self.dots.is_empty() {
+            self.game_won = true;
+        }
     }
 
     fn draw_grid(&self, ctx: &mut Context, canvas: &mut graphics::Canvas) -> GameResult {
@@ -167,6 +201,13 @@ impl GameState {
         canvas.draw(&grid_mesh, DrawParam::default());
         
         Ok(())
+    }
+
+    fn is_point_in_rect(&self, point: Vec2, rect_pos: Vec2, rect_size: Vec2) -> bool {
+        point.x >= rect_pos.x 
+            && point.x <= rect_pos.x + rect_size.x 
+            && point.y >= rect_pos.y 
+            && point.y <= rect_pos.y + rect_size.y
     }
 }
 
@@ -221,6 +262,70 @@ impl event::EventHandler for GameState {
                 .dest([10.0, 10.0]),
         );
 
+        // Draw victory overlay if game is won
+        if self.game_won {
+            // Semi-transparent background
+            let overlay = graphics::Mesh::new_rectangle(
+                ctx,
+                DrawMode::fill(),
+                graphics::Rect::new(0.0, 0.0, SCREEN_WIDTH, SCREEN_HEIGHT),
+                Color::new(0.0, 0.0, 0.0, 0.7),
+            )?;
+            canvas.draw(&overlay, DrawParam::default());
+
+            // "You Won!" text
+            let won_text = graphics::Text::new("You Won!");
+            let won_dims = won_text.dimensions(ctx);
+            canvas.draw(
+                &won_text,
+                DrawParam::default()
+                    .color(Color::WHITE)
+                    .dest([
+                        SCREEN_WIDTH * 0.5 - won_dims.unwrap().w * 0.5,
+                        SCREEN_HEIGHT * 0.4,
+                    ]),
+            );
+
+            // Final score text
+            let score_text = graphics::Text::new(format!("Final Score: {}", self.score));
+            let score_dims = score_text.dimensions(ctx);
+            canvas.draw(
+                &score_text,
+                DrawParam::default()
+                    .color(Color::WHITE)
+                    .dest([
+                        SCREEN_WIDTH * 0.5 - score_dims.unwrap().w * 0.5,
+                        SCREEN_HEIGHT * 0.5,
+                    ]),
+            );
+
+            // Play Again button
+            let button_width = 200.0;
+            let button_height = 50.0;
+            let button_x = SCREEN_WIDTH * 0.5 - button_width * 0.5;
+            let button_y = SCREEN_HEIGHT * 0.6;
+            
+            let button = graphics::Mesh::new_rectangle(
+                ctx,
+                DrawMode::fill(),
+                graphics::Rect::new(button_x, button_y, button_width, button_height),
+                Color::new(0.3, 0.3, 0.8, 1.0),
+            )?;
+            canvas.draw(&button, DrawParam::default());
+
+            let button_text = graphics::Text::new("Play Again");
+            let text_dims = button_text.dimensions(ctx);
+            canvas.draw(
+                &button_text,
+                DrawParam::default()
+                    .color(Color::WHITE)
+                    .dest([
+                        button_x + button_width * 0.5 - text_dims.unwrap().w * 0.5,
+                        button_y + button_height * 0.5 - text_dims.unwrap().h * 0.5,
+                    ]),
+            );
+        }
+
         canvas.finish(ctx)?;
         Ok(())
     }
@@ -245,6 +350,31 @@ impl event::EventHandler for GameState {
                 self.direction_controller.queue_direction(Direction::Right);
             }
             _ => (),
+        }
+        Ok(())
+    }
+
+    fn mouse_button_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        button: MouseButton,
+        x: f32,
+        y: f32,
+    ) -> GameResult {
+        if self.game_won && button == MouseButton::Left {
+            // Check if click is within Play Again button bounds
+            let button_width = 200.0;
+            let button_height = 50.0;
+            let button_x = SCREEN_WIDTH * 0.5 - button_width * 0.5;
+            let button_y = SCREEN_HEIGHT * 0.6;
+            
+            if self.is_point_in_rect(
+                Vec2::new(x, y),
+                Vec2::new(button_x, button_y),
+                Vec2::new(button_width, button_height),
+            ) {
+                self.reset();
+            }
         }
         Ok(())
     }
