@@ -4,6 +4,19 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.81"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 ggez = "0.9"
 glam = "0.24"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+web-sys = { version = "0.3", features = [
+    "CanvasRenderingContext2d",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "Window",
+    "KeyboardEvent",
+    "MouseEvent",
+] }

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Pacman Rust</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas" width="800" height="600"></canvas>
+    <script type="module">
+        import init, { Game } from './pkg/pacman_rust.js';
+
+        async function run() {
+            await init();
+            
+            const game = new Game("game-canvas");
+            
+            // Handle keyboard input
+            document.addEventListener('keydown', (event) => {
+                game.handle_keydown(event.code);
+            });
+
+            // Game loop
+            function gameLoop() {
+                game.update();
+                game.render();
+                requestAnimationFrame(gameLoop);
+            }
+
+            gameLoop();
+        }
+
+        run();
+    </script>
+</body>
+</html> 
