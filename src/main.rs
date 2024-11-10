@@ -337,16 +337,16 @@ impl event::EventHandler for GameState {
         _repeat: bool,
     ) -> GameResult {
         match input.keycode {
-            Some(KeyCode::Up) => {
+            Some(KeyCode::Up) | Some(KeyCode::W) => {
                 self.direction_controller.queue_direction(Direction::Up);
             }
-            Some(KeyCode::Down) => {
+            Some(KeyCode::Down) | Some(KeyCode::S) => {
                 self.direction_controller.queue_direction(Direction::Down);
             }
-            Some(KeyCode::Left) => {
+            Some(KeyCode::Left) | Some(KeyCode::A) => {
                 self.direction_controller.queue_direction(Direction::Left);
             }
-            Some(KeyCode::Right) => {
+            Some(KeyCode::Right) | Some(KeyCode::D) => {
                 self.direction_controller.queue_direction(Direction::Right);
             }
             _ => (),
