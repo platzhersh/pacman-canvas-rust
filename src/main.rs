@@ -12,6 +12,8 @@ const CELL_SIZE: f32 = 30.0;
 const PACMAN_SPEED: f32 = 5.0;
 const SCREEN_WIDTH: f32 = 800.0;
 const SCREEN_HEIGHT: f32 = 600.0;
+const MOUTH_SPEED: f32 = 0.2;
+const MAX_MOUTH_ANGLE: f32 = 1.0; // Increased from 0.7 to 1.0 (about 57 degrees)
 
 #[derive(Copy, Clone, Debug)]
 enum Direction {
@@ -72,6 +74,8 @@ struct GameObject {
     pos: Vec2,
     direction: Vec2,
     size: f32,
+    mouth_angle: f32,
+    mouth_opening: bool,
 }
 
 struct GameState {
@@ -100,6 +104,8 @@ impl GameState {
                 pos: Vec2::new(CELL_SIZE, GRID_SIZE as f32 * CELL_SIZE / 2.0),
                 direction: Vec2::new(0.0, 0.0),
                 size: CELL_SIZE * 0.8,
+                mouth_angle: 0.0,
+                mouth_opening: true,
             },
             dots,
             score: 0,
@@ -128,6 +134,8 @@ impl GameState {
         self.score = 0;
         self.game_won = false;
         self.direction_controller = DirectionController::new();
+        self.pacman.mouth_angle = 0.0;
+        self.pacman.mouth_opening = true;
     }
 
     fn update(&mut self) {
@@ -167,6 +175,25 @@ impl GameState {
         // Check for victory condition
         if self.dots.is_empty() {
             self.game_won = true;
+        }
+
+        // Update mouth animation
+        if self.pacman.direction.length() > 0.0 {
+            if self.pacman.mouth_opening {
+                self.pacman.mouth_angle += MOUTH_SPEED;
+                if self.pacman.mouth_angle >= MAX_MOUTH_ANGLE {
+                    self.pacman.mouth_opening = false;
+                }
+            } else {
+                self.pacman.mouth_angle -= MOUTH_SPEED;
+                if self.pacman.mouth_angle <= 0.0 {
+                    self.pacman.mouth_opening = true;
+                }
+            }
+        } else {
+            // Reset mouth when not moving
+            self.pacman.mouth_angle = 0.0;
+            self.pacman.mouth_opening = true;
         }
     }
 
@@ -241,17 +268,53 @@ impl event::EventHandler for GameState {
 
         // Draw Pacman
         let mut mesh_builder = MeshBuilder::new();
+        
+        // Calculate rotation angle based on direction
+        let rotation = if self.pacman.direction.length() > 0.0 {
+            self.pacman.direction.y.atan2(self.pacman.direction.x)
+        } else {
+            0.0 // Face right when not moving
+        };
+
+        // Draw Pacman body (a pie shape)
         let mesh_data = mesh_builder
             .circle(
                 DrawMode::fill(),
-                [self.pacman.pos.x, self.pacman.pos.y],
+                [0.0, 0.0],  // Center at origin for rotation
                 self.pacman.size * 0.5,
                 0.1,
                 Color::YELLOW,
             )?
             .build();
+        
         let pacman_mesh = graphics::Mesh::from_data(ctx, mesh_data);
-        canvas.draw(&pacman_mesh, DrawParam::default());
+        
+        // Draw the pie-shaped mouth cutout (both sides)
+        let mouth_mesh = Mesh::new_polygon(
+            ctx,
+            DrawMode::fill(),
+            &[
+                [0.0, 0.0],
+                [self.pacman.size * 0.5, -self.pacman.size * 0.5 * self.pacman.mouth_angle.sin()],
+                [self.pacman.size * 0.5, self.pacman.size * 0.5 * self.pacman.mouth_angle.sin()],
+            ],
+            Color::BLACK,
+        )?;
+
+        // Draw Pacman with proper positioning and rotation
+        canvas.draw(
+            &pacman_mesh,
+            DrawParam::default()
+                .dest([self.pacman.pos.x, self.pacman.pos.y])
+                .rotation(rotation)
+        );
+        
+        canvas.draw(
+            &mouth_mesh,
+            DrawParam::default()
+                .dest([self.pacman.pos.x, self.pacman.pos.y])
+                .rotation(rotation)
+        );
 
         // Draw score
         let score_text = graphics::Text::new(format!("Score: {}", self.score));
